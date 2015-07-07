@@ -1,5 +1,5 @@
 /*
-	Copyright 2012-2014 Benjamin Vedder	benjamin@vedder.se
+	Copyright 2012-2015 Benjamin Vedder	benjamin@vedder.se
 
 	This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,25 +16,20 @@
     */
 
 /*
- * commands.h
+ * flash_helper.h
  *
- *  Created on: 19 sep 2014
+ *  Created on: 6 maj 2015
  *      Author: benjamin
  */
 
-#ifndef COMMANDS_H_
-#define COMMANDS_H_
+#ifndef FLASH_HELPER_H_
+#define FLASH_HELPER_H_
 
-#include "datatypes.h"
+#include "conf_general.h"
 
 // Functions
-void commands_init(void);
-void commands_set_send_func(void(*func)(unsigned char *data, unsigned int len));
-void commands_send_packet(unsigned char *data, unsigned int len);
-void commands_process_packet(unsigned char *data, unsigned int len);
-void commands_printf(char* format, ...);
-void commands_send_samples(uint8_t *data, int len);
-void commands_send_rotor_pos(float rotor_pos);
-void commands_send_experiment_samples(float *samples, int len);
+uint16_t flash_helper_erase_new_app(uint32_t new_app_size);
+uint16_t flash_helper_write_new_app_data(uint32_t offset, uint8_t *data, uint32_t len);
+void flash_helper_jump_to_bootloader(void);
 
-#endif /* COMMANDS_H_ */
+#endif /* FLASH_HELPER_H_ */

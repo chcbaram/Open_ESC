@@ -1,5 +1,5 @@
 /*
-	Copyright 2012-2014 Benjamin Vedder	benjamin@vedder.se
+	Copyright 2012-2015 Benjamin Vedder	benjamin@vedder.se
 
 	This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -38,6 +38,7 @@
 #include "comm_can.h"
 #include "ws2811.h"
 #include "led_external.h"
+#include "encoder.h"
 
 
 /*
@@ -47,8 +48,8 @@
  * TIM2: mcpwm
  * TIM12: mcpwm
  * TIM8: mcpwm
- * TIM3: servo_dec
- * TIM4: WS2811/WS2812 LEDs
+ * TIM3: servo_dec/Encoder (HW_R2)
+ * TIM4: WS2811/WS2812 LEDs/Encoder (other HW)
  *
  * DMA/stream	Device		Function
  * 1, 2			I2C1		Nunchuk, temp on rev 4.5
@@ -80,7 +81,7 @@
  */
 
 // Private variables
-#define ADC_SAMPLE_MAX_LEN		4000
+#define ADC_SAMPLE_MAX_LEN		2000
 static volatile int16_t curr0_samples[ADC_SAMPLE_MAX_LEN];
 static volatile int16_t curr1_samples[ADC_SAMPLE_MAX_LEN];
 static volatile int16_t ph1_samples[ADC_SAMPLE_MAX_LEN];
@@ -96,7 +97,6 @@ static volatile int sample_int = 1;
 static volatile int sample_ready = 1;
 static volatile int sample_now = 0;
 static volatile int sample_at_start = 0;
-static volatile int was_start_sample = 0;
 static volatile int start_comm = 0;
 static volatile float main_last_adc_duration = 0.0;
 
@@ -144,7 +144,12 @@ static msg_t periodic_thread(void *arg) {
 			commands_send_rotor_pos(mcpwm_get_detect_pos());
 		}
 
-		chThdSleepMilliseconds(25);
+#if ENCODER_ENABLE
+//		commands_send_rotor_pos(encoder_read_deg());
+//		comm_can_set_pos(0, encoder_read_deg());
+#endif
+
+		chThdSleepMilliseconds(10);
 	}
 
 	return 0;
@@ -213,7 +218,6 @@ void main_dma_adc_handler(void) {
 			start_comm != mcpwm_get_comm_step())) {
 		sample_now = 0;
 		sample_ready = 0;
-		was_start_sample = 1;
 		sample_at_start = 0;
 	}
 
@@ -226,41 +230,31 @@ void main_dma_adc_handler(void) {
 			if (mcpwm_get_state() == MC_STATE_DETECTING) {
 				curr0_samples[sample_now] = (int16_t)mcpwm_detect_currents[mcpwm_get_comm_step() - 1];
 				curr1_samples[sample_now] = (int16_t)mcpwm_detect_currents_diff[mcpwm_get_comm_step() - 1];
+
+				ph1_samples[sample_now] = (int16_t)mcpwm_detect_voltages[0];
+				ph2_samples[sample_now] = (int16_t)mcpwm_detect_voltages[1];
+				ph3_samples[sample_now] = (int16_t)mcpwm_detect_voltages[2];
 			} else {
 				curr0_samples[sample_now] = ADC_curr_norm_value[0];
 				curr1_samples[sample_now] = ADC_curr_norm_value[1];
+
+				ph1_samples[sample_now] = ADC_V_L1 - mcpwm_vzero;
+				ph2_samples[sample_now] = ADC_V_L2 - mcpwm_vzero;
+				ph3_samples[sample_now] = ADC_V_L3 - mcpwm_vzero;
 			}
 
-			ph1_samples[sample_now] = ADC_V_L1 - mcpwm_vzero;
-			ph2_samples[sample_now] = ADC_V_L2 - mcpwm_vzero;
-			ph3_samples[sample_now] = ADC_V_L3 - mcpwm_vzero;
 			vzero_samples[sample_now] = mcpwm_vzero;
 
 			curr_fir_samples[sample_now] = (int16_t)(mcpwm_get_tot_current_filtered() * 100.0);
 			f_sw_samples[sample_now] = (int16_t)(mcpwm_get_switching_frequency_now() / 10.0);
 
-			uint8_t tmp;
-
-			if (was_start_sample) {
-				if (mcpwm_get_state() == MC_STATE_OFF) {
-					tmp = 1;
-				} else if (mcpwm_get_state() == MC_STATE_RUNNING) {
-					tmp = 2;
-				} else {
-					tmp = 3;
-				}
-			} else {
-				tmp = mcpwm_read_hall_phase();
-			}
-
-			status_samples[sample_now] = mcpwm_get_comm_step() | (tmp << 3);
+			status_samples[sample_now] = mcpwm_get_comm_step() | (mcpwm_read_hall_phase() << 3);
 
 			sample_now++;
 
 			if (sample_now == sample_len) {
 				sample_ready = 1;
 				sample_now = 0;
-				was_start_sample = 0;
 				chSysLockFromIsr();
 				chEvtSignalI(sample_send_tp, (eventmask_t) 1);
 				chSysUnlockFromIsr();
@@ -308,17 +302,25 @@ int main(void) {
 
 	commands_init();
 	comm_usb_init();
-	comm_can_init();
 
 	app_configuration appconf;
 	conf_general_read_app_configuration(&appconf);
 	app_init(&appconf);
+
 	timeout_init();
 	timeout_configure(appconf.timeout_msec, appconf.timeout_brake_current);
+
+#if CAN_ENABLE
+	comm_can_init();
+#endif
 
 #if WS2811_ENABLE
 	ws2811_init();
 	led_external_init();
+#endif
+
+#if ENCODER_ENABLE
+	encoder_init();
 #endif
 
 	// Threads
@@ -327,6 +329,6 @@ int main(void) {
 	chThdCreateStatic(timer_thread_wa, sizeof(timer_thread_wa), NORMALPRIO, timer_thread, NULL);
 
 	for(;;) {
-		chThdSleepMilliseconds(100);
+		chThdSleepMilliseconds(5000);
 	}
 }

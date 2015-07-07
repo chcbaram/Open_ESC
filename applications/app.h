@@ -35,11 +35,16 @@ void app_set_configuration(app_configuration *conf);
 // Standard apps
 void app_ppm_start(void);
 void app_ppm_configure(ppm_config *conf);
+void app_adc_start(void);
+void app_adc_configure(adc_config *conf);
+float app_adc_get_decoded_level(void);
+float app_adc_get_voltage(void);
 void app_uartcomm_start(void);
 void app_uartcomm_configure(uint32_t baudrate);
 void app_nunchuk_start(void);
 void app_nunchuk_configure(chuk_config *conf);
 float app_nunchuk_get_decoded_chuk(void);
+void app_nunchuk_update_output(chuck_data *data);
 
 // Custom apps
 void app_gurgalof_init(void);

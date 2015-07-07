@@ -80,6 +80,7 @@ include $(CHIBIOS)/os/ports/GCC/ARMCMx/STM32F4xx/port.mk
 include $(CHIBIOS)/os/kernel/kernel.mk
 include hwconf/hwconf.mk
 include applications/applications.mk
+include nrf/nrf.mk
 
 # Define linker script file here
 LDSCRIPT= ld_eeprom_emu.ld
@@ -116,8 +117,11 @@ CSRC = $(PORTSRC) \
        comm_can.c \
        ws2811.c \
        led_external.c \
+       encoder.c \
+       flash_helper.c \
        $(HWSRC) \
-       $(APPSRC)
+       $(APPSRC) \
+       $(NRFSRC)
        
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
@@ -151,7 +155,8 @@ INCDIR = $(PORTINC) $(KERNINC) \
          $(CHIBIOS)/os/various \
          mcconf \
          $(HWINC) \
-         $(APPINC)
+         $(APPINC) \
+         $(NRFINC)
 
 #
 # Project, sources and paths
@@ -273,5 +278,3 @@ upload: build/$(PROJECT).bin
 
 debug-start:
 	openocd -f stm32-bv_openocd.cfg
-	
-	

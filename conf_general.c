@@ -19,34 +19,16 @@
 #include "mcconf_outrunner1.h"
 #elif defined MCCONF_OUTRUNNER2
 #include "mcconf_outrunner2.h"
-#elif defined MCCONF_OUTRUNNER_OR
-#include "mcconf_outrunner_or.h"
-#elif defined MCCONF_OUTRUNNER_BL
-#include "mcconf_outrunner_bl.h"
-#elif defined MCCONF_RCCAR1
-#include "mcconf_rccar1.h"
-#elif defined MCCONF_RCCAR2
-#include "mcconf_rccar2.h"
 #elif defined MCCONF_STEN
 #include "mcconf_sten.h"
-#elif defined MCCONF_GURGALOF
-#include "mcconf_gurgalof.h"
-#elif defined MCCONF_HDD
-#include "mcconf_hdd.h"
 #endif
 
 // Parameters that can be overridden
+#ifndef MC_DEFAULT_MOTOR_TYPE
+#define MC_DEFAULT_MOTOR_TYPE			MOTOR_TYPE_BLDC
+#endif
 #ifndef MCPWM_PWM_MODE
 #define MCPWM_PWM_MODE					PWM_MODE_SYNCHRONOUS // Default PWM mode
-#endif
-#ifndef MCPWM_HALL_DIR
-#define MCPWM_HALL_DIR					0		// Hall sensor direction [0 or 1]
-#endif
-#ifndef MCPWM_HALL_FWD_ADD
-#define MCPWM_HALL_FWD_ADD				0		// Hall sensor offset fwd [0 to 5]
-#endif
-#ifndef MCPWM_HALL_REV_ADD
-#define MCPWM_HALL_REV_ADD				0		// Hall sensor offset rev [0 to 5]
 #endif
 #ifndef MCPWM_MIN_VOLTAGE
 #define MCPWM_MIN_VOLTAGE				8.0		// Minimum input voltage
@@ -102,6 +84,40 @@
 #ifndef MCPWM_MAX_FB_CURR_DIR_CHANGE
 #define MCPWM_MAX_FB_CURR_DIR_CHANGE	10.0	// Maximum current during full brake during which a direction change is allowed
 #endif
+#ifndef MCPWM_MIN_DUTY
+#define MCPWM_MIN_DUTY					0.005	// Minimum duty cycle
+#endif
+#ifndef MCPWM_MAX_DUTY
+#define MCPWM_MAX_DUTY					0.95	// Maximum duty cycle
+#endif
+#ifndef MCPWM_HALL_ERPM
+#define MCPWM_HALL_ERPM					2000.0	// ERPM above which sensorless commutation is used in hybrid mode
+#endif
+// Default hall sensor table
+#ifndef MCPWM_HALL_TAB_0
+#define MCPWM_HALL_TAB_0				-1
+#endif
+#ifndef MCPWM_HALL_TAB_1
+#define MCPWM_HALL_TAB_1				1
+#endif
+#ifndef MCPWM_HALL_TAB_2
+#define MCPWM_HALL_TAB_2				3
+#endif
+#ifndef MCPWM_HALL_TAB_3
+#define MCPWM_HALL_TAB_3				2
+#endif
+#ifndef MCPWM_HALL_TAB_4
+#define MCPWM_HALL_TAB_4				5
+#endif
+#ifndef MCPWM_HALL_TAB_5
+#define MCPWM_HALL_TAB_5				6
+#endif
+#ifndef MCPWM_HALL_TAB_6
+#define MCPWM_HALL_TAB_6				4
+#endif
+#ifndef MCPWM_HALL_TAB_7
+#define MCPWM_HALL_TAB_7				-1
+#endif
 
 // EEPROM settings
 #define EEPROM_BASE_MCCONF		1000
@@ -156,20 +172,40 @@ void conf_general_read_app_configuration(app_configuration *conf) {
 		conf->controller_id = 0;
 		conf->timeout_msec = 1000;
 		conf->timeout_brake_current = 0.0;
-		conf->send_can_status = true;
+		conf->send_can_status = false;
+		conf->send_can_status_rate_hz = 500;
 
-		conf->app_to_use = APP_NONE;
+		// The default app is UART in case the UART port is used for
+		// firmware updates.
+		conf->app_to_use = APP_UART;
 
-		conf->app_ppm_conf.ctrl_type = PPM_CTRL_TYPE_CURRENT;
+		conf->app_ppm_conf.ctrl_type = PPM_CTRL_TYPE_NONE;
 		conf->app_ppm_conf.pid_max_erpm = 15000;
 		conf->app_ppm_conf.hyst = 0.15;
 		conf->app_ppm_conf.pulse_start = 1.0;
-		conf->app_ppm_conf.pulse_width = 1.0;
+		conf->app_ppm_conf.pulse_end = 2.0;
+		conf->app_ppm_conf.median_filter = false;
+		conf->app_ppm_conf.safe_start = true;
 		conf->app_ppm_conf.rpm_lim_start = 150000.0;
 		conf->app_ppm_conf.rpm_lim_end = 200000.0;
-		conf->app_ppm_conf.multi_esc = true;
+		conf->app_ppm_conf.multi_esc = false;
 		conf->app_ppm_conf.tc = false;
 		conf->app_ppm_conf.tc_max_diff = 3000.0;
+
+		conf->app_adc_conf.ctrl_type = ADC_CTRL_TYPE_NONE;
+		conf->app_adc_conf.hyst = 0.15;
+		conf->app_adc_conf.voltage_start = 0.9;
+		conf->app_adc_conf.voltage_end = 3.0;
+		conf->app_adc_conf.use_filter = true;
+		conf->app_adc_conf.safe_start = true;
+		conf->app_adc_conf.button_inverted = false;
+		conf->app_adc_conf.voltage_inverted = false;
+		conf->app_adc_conf.rpm_lim_start = 150000;
+		conf->app_adc_conf.rpm_lim_end = 200000;
+		conf->app_adc_conf.multi_esc = false;
+		conf->app_adc_conf.tc = false;
+		conf->app_adc_conf.tc_max_diff = 3000.0;
+		conf->app_adc_conf.update_rate_hz = 500;
 
 		conf->app_uart_baudrate = 115200;
 
@@ -192,6 +228,7 @@ void conf_general_read_app_configuration(app_configuration *conf) {
  * A pointer to the configuration that should be stored.
  */
 bool conf_general_store_app_configuration(app_configuration *conf) {
+	mcpwm_unlock();
 	mcpwm_release_motor();
 
 	utils_sys_lock_cnt();
@@ -244,6 +281,8 @@ void conf_general_read_mc_configuration(mc_configuration *conf) {
 	if (!is_ok) {
 		conf->pwm_mode = MCPWM_PWM_MODE;
 		conf->comm_mode = MCPWM_COMM_MODE;
+		conf->motor_type = MC_DEFAULT_MOTOR_TYPE;
+		conf->sensor_mode = MCPWM_SENSOR_MODE;
 
 		conf->l_current_max = MCPWM_CURRENT_MAX;
 		conf->l_current_min = MCPWM_CURRENT_MIN;
@@ -262,13 +301,14 @@ void conf_general_read_mc_configuration(mc_configuration *conf) {
 		conf->l_temp_fet_end = MCPWM_LIM_TEMP_FET_END;
 		conf->l_temp_motor_start = MCPWM_LIM_TEMP_MOTOR_START;
 		conf->l_temp_motor_end = MCPWM_LIM_TEMP_MOTOR_END;
+		conf->l_min_duty = MCPWM_MIN_DUTY;
+		conf->l_max_duty = MCPWM_MAX_DUTY;
 
 		conf->lo_current_max = conf->l_current_max;
 		conf->lo_current_min = conf->l_current_min;
 		conf->lo_in_current_max = conf->l_in_current_max;
 		conf->lo_in_current_min = conf->l_in_current_min;
 
-		conf->sl_is_sensorless = MCPWM_IS_SENSORLESS;
 		conf->sl_min_erpm = MCPWM_MIN_RPM;
 		conf->sl_max_fullbreak_current_dir_change = MCPWM_MAX_FB_CURR_DIR_CHANGE;
 		conf->sl_min_erpm_cycle_int_limit = MCPWM_CYCLE_INT_LIMIT_MIN_RPM;
@@ -277,18 +317,29 @@ void conf_general_read_mc_configuration(mc_configuration *conf) {
 		conf->sl_cycle_int_rpm_br = MCPWM_CYCLE_INT_START_RPM_BR;
 		conf->sl_bemf_coupling_k = MCPWM_BEMF_INPUT_COUPLING_K;
 
-		conf->hall_dir = MCPWM_HALL_DIR;
-		conf->hall_fwd_add = MCPWM_HALL_FWD_ADD;
-		conf->hall_rev_add = MCPWM_HALL_REV_ADD;
+		conf->hall_table[0] = MCPWM_HALL_TAB_0;
+		conf->hall_table[1] = MCPWM_HALL_TAB_1;
+		conf->hall_table[2] = MCPWM_HALL_TAB_2;
+		conf->hall_table[3] = MCPWM_HALL_TAB_3;
+		conf->hall_table[4] = MCPWM_HALL_TAB_4;
+		conf->hall_table[5] = MCPWM_HALL_TAB_5;
+		conf->hall_table[6] = MCPWM_HALL_TAB_6;
+		conf->hall_table[7] = MCPWM_HALL_TAB_7;
+		conf->hall_sl_erpm = MCPWM_HALL_ERPM;
 
 		conf->s_pid_kp = MCPWM_PID_KP;
 		conf->s_pid_ki = MCPWM_PID_KI;
 		conf->s_pid_kd = MCPWM_PID_KD;
 		conf->s_pid_min_rpm = MCPWM_PID_MIN_RPM;
 
+		conf->p_pid_kp = MCPWM_P_PID_KP;
+		conf->p_pid_ki = MCPWM_P_PID_KI;
+		conf->p_pid_kd = MCPWM_P_PID_KD;
+
 		conf->cc_startup_boost_duty = MCPWM_CURRENT_STARTUP_BOOST;
 		conf->cc_min_current = MCPWM_CURRENT_CONTROL_MIN;
 		conf->cc_gain = MCPWM_CURRENT_CONTROL_GAIN;
+		conf->cc_ramp_step_max = 0.04;
 
 		conf->m_fault_stop_time_ms = MCPWM_FAULT_STOP_TIME;
 	}
@@ -301,6 +352,7 @@ void conf_general_read_mc_configuration(mc_configuration *conf) {
  * A pointer to the configuration that should be stored.
  */
 bool conf_general_store_mc_configuration(mc_configuration *conf) {
+	mcpwm_unlock();
 	mcpwm_release_motor();
 
 	utils_sys_lock_cnt();
@@ -330,23 +382,28 @@ bool conf_general_store_mc_configuration(mc_configuration *conf) {
 }
 
 bool conf_general_detect_motor_param(float current, float min_rpm, float low_duty,
-		float *int_limit, float *bemf_coupling_k) {
+		float *int_limit, float *bemf_coupling_k, int8_t *hall_table, int *hall_res) {
 
 	int ok_steps = 0;
+	const float spinup_to_duty = 0.6;
 
 	mc_configuration mcconf_old = *mcpwm_get_configuration();
 	mc_configuration mcconf = *mcpwm_get_configuration();
 
+	mcconf.sensor_mode = SENSOR_MODE_SENSORLESS;
 	mcconf.comm_mode = COMM_MODE_DELAY;
 	mcconf.sl_phase_advance_at_br = 1.0;
 	mcconf.sl_min_erpm = min_rpm;
 	mcpwm_set_configuration(&mcconf);
 
+	mcpwm_lock();
+
+	mcpwm_lock_override_once();
 	mcpwm_set_current(current);
 
 	// Spin up the motor
 	for (int i = 0;i < 5000;i++) {
-		if (mcpwm_get_duty_cycle_now() < 0.6) {
+		if (mcpwm_get_duty_cycle_now() < spinup_to_duty) {
 			chThdSleepMilliseconds(1);
 		} else {
 			ok_steps++;
@@ -354,7 +411,16 @@ bool conf_general_detect_motor_param(float current, float min_rpm, float low_dut
 		}
 	}
 
+	// Reset hall sensor samples
+	mcpwm_reset_hall_detect_table();
+
+	// Run for a while to get hall sensor samples
+	mcpwm_lock_override_once();
+	mcpwm_set_duty(spinup_to_duty);
+	chThdSleepMilliseconds(400);
+
 	// Release the motor and wait a few commutations
+	mcpwm_lock_override_once();
 	mcpwm_set_current(0.0);
 	int tacho = mcpwm_get_tachometer_value(0);
 	for (int i = 0;i < 2000;i++) {
@@ -378,6 +444,9 @@ bool conf_general_detect_motor_param(float current, float min_rpm, float low_dut
 		}
 	}
 
+	// Get hall detect result
+	*hall_res = mcpwm_get_hall_detect_result(hall_table);
+
 	*int_limit = mcpwm_read_reset_avg_cycle_integrator();
 
 	// Wait for the motor to slow down
@@ -389,6 +458,8 @@ bool conf_general_detect_motor_param(float current, float min_rpm, float low_dut
 			break;
 		}
 	}
+
+	mcpwm_lock_override_once();
 	mcpwm_set_duty(low_duty);
 
 	// Average the cycle integrator for 100 commutations
@@ -410,7 +481,8 @@ bool conf_general_detect_motor_param(float current, float min_rpm, float low_dut
 	float avg_cycle_integrator_running = mcpwm_read_reset_avg_cycle_integrator();
 	float rpm = rpm_sum / rpm_iterations;
 
-	mcpwm_set_current(0.0);
+	mcpwm_lock_override_once();
+	mcpwm_release_motor();
 
 	// Try to figure out the coupling factor
 	avg_cycle_integrator_running -= *int_limit;
@@ -420,6 +492,8 @@ bool conf_general_detect_motor_param(float current, float min_rpm, float low_dut
 
 	// Restore settings
 	mcpwm_set_configuration(&mcconf_old);
+
+	mcpwm_unlock();
 
 	return ok_steps == 5 ? true : false;
 }

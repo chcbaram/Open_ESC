@@ -1,5 +1,5 @@
 /*
-	Copyright 2012-2014 Benjamin Vedder	benjamin@vedder.se
+	Copyright 2012-2015 Benjamin Vedder	benjamin@vedder.se
 
 	This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,25 +16,17 @@
     */
 
 /*
- * commands.h
+ * encoder.h
  *
- *  Created on: 19 sep 2014
+ *  Created on: 7 mar 2015
  *      Author: benjamin
  */
 
-#ifndef COMMANDS_H_
-#define COMMANDS_H_
-
-#include "datatypes.h"
+#ifndef ENCODER_H_
+#define ENCODER_H_
 
 // Functions
-void commands_init(void);
-void commands_set_send_func(void(*func)(unsigned char *data, unsigned int len));
-void commands_send_packet(unsigned char *data, unsigned int len);
-void commands_process_packet(unsigned char *data, unsigned int len);
-void commands_printf(char* format, ...);
-void commands_send_samples(uint8_t *data, int len);
-void commands_send_rotor_pos(float rotor_pos);
-void commands_send_experiment_samples(float *samples, int len);
+void encoder_init(void);
+float encoder_read_deg(void);
 
-#endif /* COMMANDS_H_ */
+#endif /* ENCODER_H_ */

@@ -43,9 +43,9 @@ static Mutex send_mutex;
 static Thread *process_tp;
 
 // Private functions
-static void process_packet(unsigned char *data, unsigned char len);
-static void send_packet(unsigned char *buffer, unsigned char len);
-static void send_packet_wrapper(unsigned char *data, unsigned char len);
+static void process_packet(unsigned char *data, unsigned int len);
+static void send_packet(unsigned char *buffer, unsigned int len);
+static void send_packet_wrapper(unsigned char *data, unsigned int len);
 
 static msg_t serial_read_thread(void *arg) {
 	(void)arg;
@@ -101,19 +101,19 @@ static msg_t serial_process_thread(void *arg) {
 	return 0;
 }
 
-static void process_packet(unsigned char *data, unsigned char len) {
+static void process_packet(unsigned char *data, unsigned int len) {
 	commands_set_send_func(send_packet_wrapper);
 	commands_process_packet(data, len);
 }
 
-static void send_packet_wrapper(unsigned char *data, unsigned char len) {
+static void send_packet_wrapper(unsigned char *data, unsigned int len) {
+	chMtxLock(&send_mutex);
 	packet_send_packet(data, len, PACKET_HANDLER);
+	chMtxUnlock();
 }
 
-static void send_packet(unsigned char *buffer, unsigned char len) {
-	chMtxLock(&send_mutex);
+static void send_packet(unsigned char *buffer, unsigned int len) {
 	chSequentialStreamWrite(&SDU1, buffer, len);
-	chMtxUnlock();
 }
 
 void comm_usb_init(void) {

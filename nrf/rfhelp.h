@@ -1,5 +1,5 @@
 /*
-	Copyright 2012-2014 Benjamin Vedder	benjamin@vedder.se
+	Copyright 2015 Benjamin Vedder	benjamin@vedder.se
 
 	This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -15,26 +15,16 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
     */
 
-/*
- * commands.h
- *
- *  Created on: 19 sep 2014
- *      Author: benjamin
- */
-
-#ifndef COMMANDS_H_
-#define COMMANDS_H_
-
-#include "datatypes.h"
+#ifndef RFHELP_H_
+#define RFHELP_H_
 
 // Functions
-void commands_init(void);
-void commands_set_send_func(void(*func)(unsigned char *data, unsigned int len));
-void commands_send_packet(unsigned char *data, unsigned int len);
-void commands_process_packet(unsigned char *data, unsigned int len);
-void commands_printf(char* format, ...);
-void commands_send_samples(uint8_t *data, int len);
-void commands_send_rotor_pos(float rotor_pos);
-void commands_send_experiment_samples(float *samples, int len);
+void rfhelp_init(void);
+void rfhelp_restart(void);
+int rfhelp_send_data(char *data, int len);
+int rfhelp_read_rx_data(char *data, int *len, int *pipe);
+int rfhelp_rf_status(void);
+void rfhelp_set_tx_addr(const char *addr, int addr_len);
+void rfhelp_set_rx_addr(int pipe, const char *addr, int addr_len);
 
-#endif /* COMMANDS_H_ */
+#endif /* RFHELP_H_ */

@@ -25,6 +25,10 @@
 #ifndef CONF_GENERAL_H_
 #define CONF_GENERAL_H_
 
+// Firmware version
+#define FW_VERSION_MAJOR	1
+#define FW_VERSION_MINOR	7
+
 #include "datatypes.h"
 
 /*
@@ -49,7 +53,7 @@
 //#define HW_VERSION_BW
 //#define HW_VERSION_40
 //#define HW_VERSION_45
-#define HW_VERSION_46
+#define HW_VERSION_46 // Also for 4.7
 //#define HW_VERSION_R2
 //#define HW_VERSION_VICTOR_R1A
 
@@ -58,13 +62,7 @@
  */
 //#define MCCONF_OUTRUNNER1
 #define MCCONF_OUTRUNNER2
-//#define MCCONF_OUTRUNNER_OR
-//#define MCCONF_OUTRUNNER_BL
-//#define MCCONF_RCCAR1
-//#define MCCONF_RCCAR2
 //#define MCCONF_STEN
-//#define MCCONF_GURGALOF
-//#define MCCONF_HDD
 
 /*
  * Select which custom application to use. To configure the default applications and
@@ -75,6 +73,24 @@
 //#define USE_APP_GURGALOF
 
 /*
+ * Use encoder
+ */
+#define ENCODER_ENABLE			0
+#define ENCODER_COUNTS			14400
+//#define ENCODER_COUNTS			10000
+
+/*
+ * Enable CAN-bus
+ */
+#define CAN_ENABLE				1
+
+/*
+ * Settings for the external LEDs (hardcoded for now)
+ */
+#define LED_EXT_BATT_LOW		25.6
+#define LED_EXT_BATT_HIGH		33.0
+
+/*
  * Output WS2811 signal on the HALL1 pin. Notice that hall sensors can't be used
  * at the same time.
  */
@@ -83,12 +99,6 @@
 #define WS2811_LED_NUM			14
 #define WS2811_USE_CH2			1		// 0: CH1 (PB6) 1: CH2 (PB7)
 
-/*
- * Settings for the external LEDs (hardcoded for now)
- */
-#define LED_EXT_BATT_LOW		25.6
-#define LED_EXT_BATT_HIGH		33.0
-
 // Functions
 void conf_general_init(void);
 void conf_general_read_app_configuration(app_configuration *conf);
@@ -96,6 +106,6 @@ bool conf_general_store_app_configuration(app_configuration *conf);
 void conf_general_read_mc_configuration(mc_configuration *conf);
 bool conf_general_store_mc_configuration(mc_configuration *conf);
 bool conf_general_detect_motor_param(float current, float min_rpm, float low_duty,
-		float *int_limit, float *bemf_coupling_k);
+		float *int_limit, float *bemf_coupling_k, int8_t *hall_table, int *hall_res);
 
 #endif /* CONF_GENERAL_H_ */
